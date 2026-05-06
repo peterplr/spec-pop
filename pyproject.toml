@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "specpop"
+version = "1.0.0"
+authors = [
+  { name="Peter Preisler"},
+]
+description = "A package for analyzing OES spectral data."
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "pandas",
+    "numpy",
+    "matplotlib",
+    "scipy",
+    "tomli",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/peterplr/spec-pop"
+
+[project.scripts]
+specpop = "specpop.main:main"

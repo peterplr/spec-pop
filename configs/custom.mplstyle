@@ -1,0 +1,46 @@
+# ==========================================
+# crm-argon Matplotlib Style Sheet
+# ==========================================
+
+# --- Colors (Ordered Dark Blue to Yellow) and Solid-Filled Markers ---
+axes.prop_cycle: cycler('color', ['383a6b', 'cb1f73', 'e03a3c', 'ea6d3d', 'fcc72d']) + cycler('marker', ['o', '^', 's', 'v', 'p'])
+
+# --- Fonts and Text ---
+font.family: sans-serif
+font.sans-serif: Helvetica, Arial, DejaVu Sans
+mathtext.default: regular
+text.color: black
+axes.labelcolor: black
+axes.labelsize: 11
+axes.titlesize: 11
+xtick.color: black
+ytick.color: black
+
+# --- Ticks ---
+# Standard for physics journals: inward pointing
+xtick.direction: in
+ytick.direction: in
+xtick.top: True
+ytick.right: True
+
+# --- Lines and Markers ---
+lines.markersize: 7
+lines.linewidth: 1.5
+
+# --- Grids ---
+# Explicitly turn on the grid and set its style here
+axes.grid: True
+grid.color: black
+grid.linestyle: --
+grid.linewidth: 0.5
+grid.alpha: 0.3
+
+# --- Legend ---
+legend.framealpha: 0.9
+legend.fontsize: 10
+
+# --- Figure Settings ---
+figure.figsize: 6,5
+figure.facecolor: white
+savefig.dpi: 300
+savefig.bbox: tight
