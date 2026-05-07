@@ -2,9 +2,9 @@
 # REQUIRED PATHS
 # -------------------
 # Paths are relative to this config file.
-data_path = "../spectra/2026-04-30/window_5V_250mA.txt"
-dark_image_path = "../spectra/2026-04-30/dark_image_40ms.txt"
-output_dir = "../output/2026-04-30/5V"
+data_path = "../spectra/2026-04-15/vacuum_chamber.txt"
+#dark_image_path = "../spectra/2026-04-30/dark_image_40ms.txt"
+output_dir = "../output/2026-04-15/manual"
 
 # -------------------
 # OPTIONAL SETTINGS
@@ -17,12 +17,13 @@ fwhm_search_window = 10.0   # How far (in nm) to look for a peak when finding FW
 default_width = 10.0        # Fallback width (in nm) if no peak is found. Default: 1.0
 
 [auto_peak]
-min_auto_peak_height = 100  # Minimum counts for auto-detected peaks (after dark subtraction). Default: 100
-auto_peak_detection_range_min = 690.0 # Minimum wavelength for auto-peak detection. Default: None (no limit)
-auto_peak_detection_range_max = 930.0 # Maximum wavelength for auto-peak detection. Default: None (no limit)
+min_auto_peak_height = 1000  # Minimum counts for auto-detected peaks (after dark subtraction). Default: 100
+auto_peak_detection_range_min = 390.0 # Minimum wavelength for auto-peak detection. Default: None (no limit)
+auto_peak_detection_range_max = 860.0 # Maximum wavelength for auto-peak detection. Default: None (no limit)
 skip_metastables = false
-match_tolerance = 1.0
-nist_ambiguity_window = 5.0 # Window (in nm) to check for ambiguous/merged peaks in NIST database. Default: 1.0
+match_tolerance = 1.1
+nist_ambiguity_window = 3.0 # Window (in nm) to check for ambiguous/merged peaks in NIST database. Default: 1.0
+ignore_wavelengths = [414.96,429.28,591.01,640.79,702.21,730.96,763.33]     # List of wavelengths (in nm) to explicitly ignore
 
 [plotting]
 plot_margin = 20.0          # Margin on each side of the overview plot. Default: 20.0
@@ -48,21 +49,32 @@ count_col_name = "Counts"
 # You can optionally add a 'width' key to manually override the
 # automatic peak integration width for a specific line.
 # ----------------------------------------------------------------
-#[[wavelengths]]
-#center = 696.54
-#
-#[[wavelengths]]
-#center = 706.72
-#
-#[[wavelengths]]
-#center = 727.29
-#
-#[[wavelengths]]
-#center = 826.45
-## width = 5.0 # Example of a manual override
-#
-#[[wavelengths]]
-#center = 866.79
-#
-#[[wavelengths]]
-#center = 912.30
+[[wavelengths]]
+center = 706.91
+
+[[wavelengths]]
+center = 696.73
+
+[[wavelengths]]
+center = 667.91
+
+[[wavelengths]]
+center = 450.35
+
+[[wavelengths]]
+center = 395.01
+
+[[wavelengths]]
+center = 404.56
+
+[[wavelengths]]
+center = 675.46
+
+[[wavelengths]]
+center = 687.32
+
+[[wavelengths]]
+center = 720.90
+
+[[wavelengths]]
+center = 603.38

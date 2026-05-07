@@ -8,11 +8,13 @@ import warnings
 class OESAnalysis:
     def __init__(self, data_path, line_data_provider=None, dark_image_path=None,
                  wl_col_name='Wavelength', count_col_name='Counts', delimiter='\t',
-                 fwhm_multiplier=3.0, fwhm_search_window=10.0, default_width=1.0):
+                 fwhm_multiplier=3.0, fwhm_search_window=10.0, default_width=1.0,
+                 ignore_wavelengths=None):
 
         self.fwhm_multiplier = fwhm_multiplier
         self.fwhm_search_window = fwhm_search_window
         self.default_width = default_width
+        self.ignore_wavelengths = ignore_wavelengths if ignore_wavelengths is not None else []
 
         # Inject the LineData class
         self.line_data = line_data_provider
@@ -97,11 +99,25 @@ class OESAnalysis:
         """
         results = []
         for peak in target_peaks:
-            target_wl = peak.get('target_wl')
-            manual_width = peak.get('manual_width', None)
+            target_wl = peak.get('center')
+            manual_width = peak.get('width', None)
+            
+            if target_wl is None:
+                continue
+
+            # Check if this wavelength is in the ignore list
+            should_ignore = any(abs(target_wl - ignore_wl) < 0.1 for ignore_wl in self.ignore_wavelengths)
+            if should_ignore:
+                print(f"Info: Skipping manually targeted line {target_wl:.2f} nm as it is in the ignore_wavelengths list.")
+                continue
             
             # Query the injected LineData class first to check for NIST ambiguity
             params = self.line_data.get_line_parameters(target_wl)
+            
+            # Print the info message if it exists (e.g. for a dominant line overriding ambiguity)
+            if params.get('info_message'):
+                print(params['info_message'])
+
             if params.get('is_ambiguous', False):
                 print(f"Warning: Multiple NIST lines found within ambiguity window around target {target_wl:.2f} nm. Disregarding.")
                 continue
@@ -109,9 +125,16 @@ class OESAnalysis:
             intensity, wl_win, counts_win, baseline, width, actual_wl, height = self.calculate_line_intensity(target_wl, manual_width)
             results.append({
                 'Target_Wavelength': target_wl,
-                'Actual_Wavelength': actual_wl,
+                'Observed_Wavelength': actual_wl, # Added to match auto detection format
                 'Integrated_Intensity': intensity,
-                'Peak_Height': height
+                'Peak_Height': height,
+                'Match_Status': 'Matched', # Assume matched for manual processing for density calc
+                'A_ki': params['A_ki'],
+                'Upper_Level_Energy_Ek': params['E_k'],
+                'n_upper': params['n_upper'],
+                'g_sub': params['g_sub'],
+                'g_lumped': params['g_lumped'],
+                'is_metastable': params['is_metastable']
             })
         return pd.DataFrame(results)
 
@@ -128,11 +151,21 @@ class OESAnalysis:
             if (range_min and center_wl < range_min) or (range_max and center_wl > range_max):
                 continue
                 
+            # Check if this wavelength is in the ignore list (with a small 0.1nm tolerance for floating point matching)
+            should_ignore = any(abs(center_wl - ignore_wl) < 0.1 for ignore_wl in self.ignore_wavelengths)
+            if should_ignore:
+                print(f"Info: Skipping detected peak near {center_wl:.2f} nm as it matches the ignore_wavelengths list.")
+                continue
+                
             intensity, _, _, _, _, actual_wl, peak_height = self.calculate_line_intensity(center_wl)
 
             # Query the injected LineData class
             params = self.line_data.get_line_parameters(actual_wl)
             
+            # Print the info message if it exists (e.g. for a dominant line overriding ambiguity)
+            if params.get('info_message'):
+                print(params['info_message'])
+
             # Check for NIST ambiguity
             if params.get('is_ambiguous', False):
                 print(f"Warning: Multiple NIST lines found within ambiguity window for experimental peak at {actual_wl:.2f} nm. Disregarding.")
@@ -169,8 +202,14 @@ class OESAnalysis:
         """
         df = matched_peaks_df[matched_peaks_df['Match_Status'] == 'Matched'].copy()
 
+        if df.empty:
+            return pd.DataFrame(), pd.DataFrame(columns=['n_upper', 'Lumped_Relative_Density', 'Lumped_Relative_Error'])
+
         if skip_metastables:
             df = df[~df['is_metastable']].copy()
+            if df.empty:
+                return pd.DataFrame(), pd.DataFrame(columns=['n_upper', 'Lumped_Relative_Density', 'Lumped_Relative_Error'])
+
 
         # Calculate n_sub (Relative density of the specific sublevel)
         df['density_sublevel'] = df['Integrated_Intensity'] / df['A_ki']

@@ -47,6 +47,7 @@ class Interface:
         self.match_tolerance = auto_peak.get('match_tolerance', settings.get('match_tolerance', 1.0))
         self.skip_metastables = auto_peak.get('skip_metastables', settings.get('skip_metastables', False))
         self.nist_ambiguity_window = auto_peak.get('nist_ambiguity_window', settings.get('nist_ambiguity_window', 1.0))
+        self.ignore_wavelengths = auto_peak.get('ignore_wavelengths', settings.get('ignore_wavelengths', []))
 
         self.wl_col_name = parser_settings.get('wl_col_name', 'Wavelength')
         self.count_col_name = parser_settings.get('count_col_name', 'Counts')
@@ -67,6 +68,7 @@ class Interface:
             fwhm_multiplier=self.fwhm_multiplier,
             fwhm_search_window=self.fwhm_search_window, # Pass the correct parameter
             default_width=self.default_width,
+            ignore_wavelengths=self.ignore_wavelengths
         )
 
         self.plotting = Plotter(output_dir=output_dir, plot_margin=self.plot_margin)
@@ -122,48 +124,43 @@ class Interface:
             print("Specific wavelengths provided. Processing target list...")
 
             # --- MANUAL LIST MODE ---
-            results = []
-            for line_info in wavelength_configs:
-                target_wl = line_info['center']
-                manual_width = line_info.get('width')
+            sublevel_df = self.analyzer.process_target_list(wavelength_configs)
 
-                # 1. Integrate the peak
+            if sublevel_df.empty:
+                print("No specific wavelengths processed. Exiting.")
+                return
+
+            # Calculate the lumped densities using the new DataFrame method
+            _, lumped_df = self.analyzer.calculate_lumped_densities(
+                sublevel_df,
+                skip_metastables=self.skip_metastables
+            )
+
+            # Quick loop to generate individual integration plots for matched lines
+            for idx, row in sublevel_df.iterrows():
+                wl = row['Observed_Wavelength']
+                target_wl = row['Target_Wavelength']
+                # Try to get the original manual width from the config based on the target_wl
+                original_config = next((item for item in wavelength_configs if item['center'] == target_wl), None)
+                manual_width = original_config.get('width') if original_config else None
+
+                # Re-fetch the window arrays specifically for plotting
                 intensity, wl_win, counts_win, baseline, width, actual_wl, peak_height = \
                     self.analyzer.calculate_line_intensity(target_wl, manual_width=manual_width)
 
-                if intensity > 0:
-                    # 2. Get Line Parameters from injected provider
-                    params = self.line_data.get_line_parameters(actual_wl)
+                if self.plot_separate_lines:
+                    self.plotting.plot_line_integration(wl_win, counts_win, baseline, actual_wl, intensity)
 
-                    # 3. Calculate Physics Parameters
-                    # Using Physics definition: N_k is proportional to (Intensity * Wavelength) / Aki
-                    density_sub = intensity / params['A_ki'] if params['A_ki'] else 0
-                    density_lumped_scaled = density_sub * (params['g_lumped'] / params['g_sub']) if params[
-                        'g_sub'] else 0
-
-                    result = {
-                        'Target_Wavelength_nm': target_wl,
-                        'Actual_Wavelength_nm': actual_wl,
-                        'Total_Counts': intensity,
-                        'A_ki': params['A_ki'],
-                        'n_upper': params['n_upper'],
-                        'g_sub': params['g_sub'],
-                        'g_lumped': params['g_lumped'],
-                        'density_sublevel': density_sub,
-                        'density_lumped_scaled': density_lumped_scaled,
-                        'width': width,
-                        'peak_height': peak_height,
-                        'is_metastable': params['is_metastable']  # ADD THIS
-                    }
-                    results.append(result)
-                    analyzed_lines_for_overview.append(result)
-
-                    # 4. Plot individual line
-                    if self.plot_separate_lines:
-                        self.plotting.plot_line_integration(wl_win, counts_win, baseline, actual_wl, intensity)
+                # Added 'width' here to prevent the KeyError in plot_overview
+                analyzed_lines_for_overview.append({
+                    'Actual_Wavelength_nm': actual_wl,
+                    'Total_Counts': intensity,
+                    'width': width
+                })
 
             # Export manual results
-            self.exporter.save_results(results)
+            self.exporter.save_results(sublevel_df.to_dict(orient='records'))
+            self.exporter.save_aggregated_results(lumped_df[['n_upper', 'Lumped_Relative_Density', 'Lumped_Relative_Error']].to_dict(orient='records'))
 
         # Plot the final global overview
         if self.plot_overview_enabled:
