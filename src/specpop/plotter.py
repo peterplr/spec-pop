@@ -37,8 +37,7 @@ class Plotter:
         print(f"Analyzed {center:.2f} nm -> Area: {intensity:.2e}. Plot saved.")
 
     def plot_overview(self, wavelengths, counts, analyzed_lines):
-        # Removed explicit figsize to use the one from custom.mplstyle (figure.figsize: 9, 6)
-        fig, ax = plt.subplots() 
+        fig, ax = plt.subplots(figsize=(10, 5))
         
         # Plot spectrum with markers and new color, using semilogy for log scale
         # Explicit marker/color/linewidth are kept as they were specifically requested,

@@ -1,5 +1,5 @@
 # -------------------
-# REQUIRED PATHS
+# DEFINE PATHS
 # -------------------
 # Paths are relative to this config file.
 data_path = "../spectra/file.txt"
@@ -7,21 +7,27 @@ data_path = "../spectra/file.txt"
 output_dir = "../output/date/"
 
 # -------------------
-# OPTIONAL SETTINGS
+# DATA PARSING
 # -------------------
-# These settings control the analysis and plotting behavior.
-# If they are not present, the program will use sensible defaults.
+[parser]
+delimiter = "\\s+"
+wl_col_name = "Wavelength"
+count_col_name = "Counts"
+
+# -------------------
+# SETTINGS
+# -------------------
 [peak_integration]
 fwhm_multiplier = 4.0       # Integration window = this * FWHM. Default: 4.0
 fwhm_search_window = 10.0   # How far (in nm) to look for a peak when finding FWHM. Default: 10.0
-default_width = 10.0        # Fallback width (in nm) if no peak is found. Default: 1.0
+default_width = 10.0        # Fallback width (in nm) if no peak is found. Default: 10.0
 
 [auto_peak]
-min_auto_peak_height = 1000  # Minimum counts for auto-detected peaks (after dark subtraction). Default: 100
+min_auto_peak_height = 100  # Minimum counts for auto-detected peaks (after dark subtraction). Default: 100
 auto_peak_detection_range_min = 390.0 # Minimum wavelength for auto-peak detection. Default: None (no limit)
 auto_peak_detection_range_max = 860.0 # Maximum wavelength for auto-peak detection. Default: None (no limit)
 skip_metastables = false
-match_tolerance = 1.1
+match_tolerance = 1.1       # nm
 nist_ambiguity_window = 3.0 # Window (in nm) to check for ambiguous/merged peaks in NIST database. Default: 1.0
 ignore_wavelengths = []     # List of wavelengths (in nm) to explicitly ignore
 
@@ -29,14 +35,6 @@ ignore_wavelengths = []     # List of wavelengths (in nm) to explicitly ignore
 plot_margin = 20.0          # Margin on each side of the overview plot. Default: 20.0
 plot_overview = true        # Generate the overview plot. Default: true
 plot_separate_lines = false # Generate individual plots for each line. Default: true
-
-# -------------------
-# DATA FILE PARSING
-# -------------------
-[parser]
-delimiter = "\\s+"
-wl_col_name = "Wavelength"
-count_col_name = "Counts"
 
 # ----------------------------------------------------------------
 # WAVELENGTHS TO ANALYZE

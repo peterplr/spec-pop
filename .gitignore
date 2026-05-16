@@ -77,3 +77,4 @@ venv.bak/
 output/
 spectra/
 old/
+/local_plots/

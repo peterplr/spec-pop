@@ -16,42 +16,44 @@ class Interface:
             self.config = tomllib.load(f)
 
         # --- Resolve paths relative to the config file location ---
-        data_path = os.path.join(config_dir, self.config['data_path'])
+        try:
+            data_path = os.path.join(config_dir, self.config['data_path'])
+            output_dir = os.path.join(config_dir, self.config['output_dir'])
+        except KeyError as e:
+            raise KeyError(f"Missing required configuration key in config.toml: {e}")
 
         dark_image_path = self.config.get('dark_image_path')
         if dark_image_path:
             dark_image_path = os.path.join(config_dir, dark_image_path)
 
-        output_dir = os.path.join(config_dir, self.config.get('output_dir', 'output'))
+        # --- Get required settings ---
+        try:
+            peak_integration = self.config['peak_integration']
+            auto_peak = self.config['auto_peak']
+            plotting_config = self.config['plotting']
+            parser_settings = self.config['parser']
 
-        # --- Get settings with defaults ---
-        peak_integration = self.config.get('peak_integration', {})
-        auto_peak = self.config.get('auto_peak', {})
-        plotting_config = self.config.get('plotting', {})
-        parser_settings = self.config.get('parser', {})
-        
-        # Fallback to general settings if subcategories are not present for backwards compatibility
-        settings = self.config.get('settings', {})
+            self.fwhm_multiplier = peak_integration['fwhm_multiplier']
+            self.fwhm_search_window = peak_integration['fwhm_search_window']
+            self.default_width = peak_integration['default_width']
+            
+            self.plot_margin = plotting_config['plot_margin']
+            self.plot_overview_enabled = plotting_config['plot_overview']
+            self.plot_separate_lines = plotting_config['plot_separate_lines']
+            
+            self.min_auto_peak_height = auto_peak['min_auto_peak_height']
+            self.auto_peak_detection_range_min = auto_peak['auto_peak_detection_range_min']
+            self.auto_peak_detection_range_max = auto_peak['auto_peak_detection_range_max']
+            self.match_tolerance = auto_peak['match_tolerance']
+            self.skip_metastables = auto_peak['skip_metastables']
+            self.nist_ambiguity_window = auto_peak['nist_ambiguity_window']
+            self.ignore_wavelengths = auto_peak['ignore_wavelengths']
 
-        self.fwhm_multiplier = peak_integration.get('fwhm_multiplier', settings.get('fwhm_multiplier', 3.0))
-        self.fwhm_search_window = peak_integration.get('fwhm_search_window', settings.get('fwhm_search_window', 10.0))
-        self.default_width = peak_integration.get('default_width', settings.get('default_width', 1.0))
-        
-        self.plot_margin = plotting_config.get('plot_margin', settings.get('plot_margin', 20.0))
-        self.plot_overview_enabled = plotting_config.get('plot_overview', settings.get('plot_overview', True))
-        self.plot_separate_lines = plotting_config.get('plot_separate_lines', settings.get('plot_separate_lines', True))
-        
-        self.min_auto_peak_height = auto_peak.get('min_auto_peak_height', settings.get('min_auto_peak_height', 500))
-        self.auto_peak_detection_range_min = auto_peak.get('auto_peak_detection_range_min', settings.get('auto_peak_detection_range_min'))
-        self.auto_peak_detection_range_max = auto_peak.get('auto_peak_detection_range_max', settings.get('auto_peak_detection_range_max'))
-        self.match_tolerance = auto_peak.get('match_tolerance', settings.get('match_tolerance', 1.0))
-        self.skip_metastables = auto_peak.get('skip_metastables', settings.get('skip_metastables', False))
-        self.nist_ambiguity_window = auto_peak.get('nist_ambiguity_window', settings.get('nist_ambiguity_window', 1.0))
-        self.ignore_wavelengths = auto_peak.get('ignore_wavelengths', settings.get('ignore_wavelengths', []))
-
-        self.wl_col_name = parser_settings.get('wl_col_name', 'Wavelength')
-        self.count_col_name = parser_settings.get('count_col_name', 'Counts')
-        self.delimiter = parser_settings.get('delimiter', '\t')
+            self.wl_col_name = parser_settings['wl_col_name']
+            self.count_col_name = parser_settings['count_col_name']
+            self.delimiter = parser_settings['delimiter']
+        except KeyError as e:
+            raise KeyError(f"Missing required configuration key in config.toml: {e}")
 
         # --- Initialize Core Components ---
         # 1. Initialize LineData first
