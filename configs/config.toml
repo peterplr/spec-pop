@@ -22,6 +22,9 @@ fwhm_multiplier = 4.0       # Integration window = this * FWHM. Default: 4.0
 fwhm_search_window = 10.0   # How far (in nm) to look for a peak when finding FWHM. Default: 10.0
 default_width = 10.0        # Fallback width (in nm) if no peak is found. Default: 10.0
 
+[analysis]
+aggregate_to_vlcek = true
+
 [auto_peak]
 min_auto_peak_height = 100  # Minimum counts for auto-detected peaks (after dark subtraction). Default: 100
 auto_peak_detection_range_min = 390.0 # Minimum wavelength for auto-peak detection. Default: None (no limit)

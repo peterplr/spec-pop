@@ -1,6 +1,7 @@
 import tomllib
 import os
 import pandas as pd
+import numpy as np
 from .analysis import OESAnalysis
 from .line_data import LineData
 from .plotter import Plotter
@@ -32,10 +33,13 @@ class Interface:
             auto_peak = self.config['auto_peak']
             plotting_config = self.config['plotting']
             parser_settings = self.config['parser']
+            analysis_config = self.config.get('analysis', {})
 
             self.fwhm_multiplier = peak_integration['fwhm_multiplier']
             self.fwhm_search_window = peak_integration['fwhm_search_window']
             self.default_width = peak_integration['default_width']
+
+            self.aggregate_to_vlcek = analysis_config.get('aggregate_to_vlcek', False)
             
             self.plot_margin = plotting_config['plot_margin']
             self.plot_overview_enabled = plotting_config['plot_overview']
@@ -95,10 +99,10 @@ class Interface:
                 print("No peaks detected above the minimum height or within the specified range. Exiting.")
                 return
 
-            # Calculate the lumped densities using the new DataFrame method
+            # Step 1 (Intra-state deduplication) is always performed to populate averaged_densities
             sublevel_df, lumped_df = self.analyzer.calculate_lumped_densities(
                 matched_peaks_df,
-                skip_metastables=self.skip_metastables  # ADD ARGUMENT HERE
+                skip_metastables=self.skip_metastables
             )
 
             # Quick loop to generate individual integration plots for matched lines
@@ -118,9 +122,10 @@ class Interface:
                     'width': width
                 })
 
-            # Export DataFrames (converting to list of dicts to match standard exporter expectations)
+            # Export DataFrames
             self.exporter.save_results(sublevel_df.to_dict(orient='records'))
-            self.exporter.save_aggregated_results(lumped_df.to_dict(orient='records'))
+            if self.aggregate_to_vlcek and not lumped_df.empty:
+                self.exporter.save_aggregated_results(lumped_df.to_dict(orient='records'))
 
         else:
             print("Specific wavelengths provided. Processing target list...")
@@ -132,8 +137,8 @@ class Interface:
                 print("No specific wavelengths processed. Exiting.")
                 return
 
-            # Calculate the lumped densities using the new DataFrame method
-            _, lumped_df = self.analyzer.calculate_lumped_densities(
+            # Step 1 (Intra-state deduplication) is always performed to populate averaged_densities
+            sublevel_df, lumped_df = self.analyzer.calculate_lumped_densities(
                 sublevel_df,
                 skip_metastables=self.skip_metastables
             )
@@ -162,7 +167,8 @@ class Interface:
 
             # Export manual results
             self.exporter.save_results(sublevel_df.to_dict(orient='records'))
-            self.exporter.save_aggregated_results(lumped_df[['n_upper', 'Lumped_Relative_Density', 'Lumped_Relative_Error']].to_dict(orient='records'))
+            if self.aggregate_to_vlcek and not lumped_df.empty:
+                self.exporter.save_aggregated_results(lumped_df.to_dict(orient='records'))
 
         # Plot the final global overview
         if self.plot_overview_enabled:

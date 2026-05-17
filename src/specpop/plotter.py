@@ -37,19 +37,16 @@ class Plotter:
         print(f"Analyzed {center:.2f} nm -> Area: {intensity:.2e}. Plot saved.")
 
     def plot_overview(self, wavelengths, counts, analyzed_lines):
+
         fig, ax = plt.subplots(figsize=(10, 5))
-        
-        # Plot spectrum with markers and new color, using semilogy for log scale
-        # Explicit marker/color/linewidth are kept as they were specifically requested,
-        # overriding the style sheet's prop_cycle for this specific line.
-        ax.semilogy(wavelengths, counts, color='#cb1f73', marker='o', markersize=2, linestyle='-', linewidth=0.5, label='Full Spectrum')
+        ax.semilogy(wavelengths, counts, marker='', linewidth=0.8, label='Spectrum')
 
         all_wl = [line['Actual_Wavelength_nm'] for line in analyzed_lines]
         
         if not all_wl: # Handle case where no lines were analyzed
             ax.set_title("Overview of Spectral Lines (No lines analyzed)")
             ax.set_xlabel("Wavelength (nm)")
-            ax.set_ylabel("Counts (log scale)") # Update label for log scale
+            ax.set_ylabel("Counts")
             ax.legend()
             plot_path = os.path.join(self.output_dir, "overview.png")
             fig.savefig(plot_path)
@@ -72,10 +69,6 @@ class Plotter:
         y_max_lim = np.max(visible_counts) * 2.0 # More headroom for log scale
         ax.set_ylim(bottom=y_min_lim, top=y_max_lim)
 
-        # --- Smart Label Placement ---
-        label_y_offsets = [y_max_lim * 0.9, y_max_lim * 0.7] # Two vertical levels for labels
-        label_iterator = 0
-
         for line in sorted(analyzed_lines, key=lambda x: x['Actual_Wavelength_nm']):
             center = line['Actual_Wavelength_nm']
             width = line['width']
@@ -84,17 +77,16 @@ class Plotter:
             # Add colored box with new color
             ax.add_patch(
                 plt.Rectangle((left_bound, y_min_lim), width, y_max_lim - y_min_lim,
-                              facecolor='#383a6b', alpha=0.2,
-                              label='Integrated Peak' if 'Integrated Peak' not in [h.get_label() for h in ax.get_legend_handles_labels()[0]] else '')
+                              facecolor='#cb1f73', alpha=0.1,
+                              linewidth=0.8, linestyle='-', edgecolor='#cb1f73',
+                              label='Integration Window' if 'Integration Window' not in [h.get_label() for h in ax.get_legend_handles_labels()[0]] else '')
             )
 
-        ax.set_title("Overview of Analyzed Spectral Lines")
         ax.set_xlabel("Wavelength (nm)")
         ax.set_ylabel("Counts")
-        # Y-scale is now linear by default
-        
+
         ax.legend()
-        
+
         plot_path = os.path.join(self.output_dir, "overview.png")
         fig.savefig(plot_path)
         plt.close(fig)

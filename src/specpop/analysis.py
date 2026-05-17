@@ -125,16 +125,18 @@ class OESAnalysis:
             intensity, wl_win, counts_win, baseline, width, actual_wl, height = self.calculate_line_intensity(target_wl, manual_width)
             results.append({
                 'Target_Wavelength': target_wl,
-                'Observed_Wavelength': actual_wl, # Added to match auto detection format
+                'Observed_Wavelength': actual_wl,
                 'Integrated_Intensity': intensity,
                 'Peak_Height': height,
                 'Match_Status': 'Matched', # Assume matched for manual processing for density calc
                 'A_ki': params['A_ki'],
+                'nist_wavelength': params['nist_wl'],
                 'Upper_Level_Energy_Ek': params['E_k'],
                 'n_upper': params['n_upper'],
                 'g_sub': params['g_sub'],
                 'g_lumped': params['g_lumped'],
-                'is_metastable': params['is_metastable']
+                'is_metastable': params['is_metastable'],
+                'upper_state_id': params['upper_state_id']
             })
         return pd.DataFrame(results)
 
@@ -183,13 +185,14 @@ class OESAnalysis:
                 'Observed_Wavelength': actual_wl,
                 'Integrated_Intensity': intensity,
                 'Match_Status': match_status,
-                'NIST_Wavelength': params['nist_wl'] if match_status == 'Matched' else np.nan,
+                'nist_wavelength': params['nist_wl'] if match_status == 'Matched' else np.nan,
                 'A_ki': params['A_ki'] if match_status == 'Matched' else np.nan,
                 'Upper_Level_Energy_Ek': params['E_k'] if match_status == 'Matched' else np.nan,
                 'n_upper': params['n_upper'] if match_status == 'Matched' else np.nan,
                 'g_sub': params['g_sub'] if match_status == 'Matched' else np.nan,
                 'g_lumped': params['g_lumped'] if match_status == 'Matched' else np.nan,
-                'is_metastable': params['is_metastable'] if match_status == 'Matched' else False
+                'is_metastable': params['is_metastable'] if match_status == 'Matched' else False,
+                'upper_state_id': params['upper_state_id'] if match_status == 'Matched' else np.nan
             }
             detected_peaks.append(peak_data)
 
@@ -197,39 +200,65 @@ class OESAnalysis:
 
     def calculate_lumped_densities(self, matched_peaks_df, skip_metastables=False):
         """
-        Calculates sublevel relative densities, extrapolates to the lumped level,
-        and averages them by Vlcek's lumped levels.
+        Calculates lumped level densities by aggregating measured sublevels 
+        using the two-step aggregation approach.
         """
         df = matched_peaks_df[matched_peaks_df['Match_Status'] == 'Matched'].copy()
 
         if df.empty:
-            return pd.DataFrame(), pd.DataFrame(columns=['n_upper', 'Lumped_Relative_Density', 'Lumped_Relative_Error'])
+            return pd.DataFrame(), pd.DataFrame(columns=['n_upper', 'lumped_relative_density'])
 
         if skip_metastables:
             df = df[~df['is_metastable']].copy()
             if df.empty:
-                return pd.DataFrame(), pd.DataFrame(columns=['n_upper', 'Lumped_Relative_Density', 'Lumped_Relative_Error'])
+                return pd.DataFrame(), pd.DataFrame(columns=['n_upper', 'lumped_relative_density'])
 
-
-        # Calculate n_sub (Relative density of the specific sublevel)
+        # Calculate raw density of the specific sublevel (N_k)
         df['density_sublevel'] = df['Integrated_Intensity'] / df['A_ki']
 
-        # Calculate n_lump (Extrapolated total density for the level based on this line)
-        df['density_lumped_scaled'] = df['density_sublevel'] * (df['g_lumped'] / df['g_sub'])
+        # Step 1 (Intra-state Deduplication): Group by exact upper state
+        # Calculate average raw density if multiple lines share the same state
+        state_counts = df.groupby('upper_state_id')['density_sublevel'].transform('count')
+        df['averaged_densities'] = np.where(state_counts > 1, 
+                                            df.groupby('upper_state_id')['density_sublevel'].transform('mean'), 
+                                            np.nan)
+        # Calculate relative error (standard deviation / mean) if multiple lines
+        # Here we use the unbiased standard deviation (ddof=1)
+        def calc_rel_error(x):
+            if len(x) > 1:
+                std = x.std()
+                mean = x.mean()
+                return std / mean if mean != 0 else 0
+            return np.nan
 
-        # Group by the lumped level 'n_upper' and calculate mean and std
-        lumped_densities = df.groupby('n_upper').agg(
-            Lumped_Relative_Density=('density_lumped_scaled', 'mean'),
-            Lumped_Density_Std=('density_lumped_scaled', 'std'),
-            Contributing_Lines=('Observed_Wavelength', 'count'),
+        df['relative_error'] = np.where(state_counts > 1,
+                                         df.groupby('upper_state_id')['density_sublevel'].transform(calc_rel_error),
+                                         np.nan)
+
+        # Deduplicate to keep only one entry per physical state
+        # We take the first entry but replace its density with the average if applicable
+        unique_states_df = df.copy()
+        unique_states_df['N_k_final'] = np.where(unique_states_df['averaged_densities'].notna(),
+                                                 unique_states_df['averaged_densities'],
+                                                 unique_states_df['density_sublevel'])
+        
+        unique_states_df = unique_states_df.sort_values('Observed_Wavelength').drop_duplicates('upper_state_id')
+
+        # Step 2 (Inter-state Lumping): Group the unique states from Step 1 by their target Vlcek state
+        lumped_densities = unique_states_df.groupby('n_upper').agg(
+            sum_N_k=('N_k_final', 'sum'),
+            sum_g_k=('g_sub', 'sum'),
             g_lumped=('g_lumped', 'first'),
-            Avg_Ek=('Upper_Level_Energy_Ek', 'mean')
+            g_lines_list=('g_sub', lambda x: list(x.astype(str)))
         ).reset_index()
 
-        # Calculate relative error
-        lumped_densities['Lumped_Relative_Error'] = lumped_densities['Lumped_Density_Std'] / lumped_densities['Lumped_Relative_Density']
+        # Calculate final lumped density: lumped_density = sum_N_k * (g_lump_total / sum_g_k)
+        lumped_densities['lumped_relative_density'] = lumped_densities['sum_N_k'] * (lumped_densities['g_lumped'] / lumped_densities['sum_g_k'])
         
-        # We can drop the Std column if we only want to save the relative error
-        lumped_densities = lumped_densities.drop(columns=['Lumped_Density_Std'])
+        # Format g_lines as a string: "g1 + g2 + ..."
+        lumped_densities['g_lines'] = lumped_densities['g_lines_list'].apply(lambda x: ' + '.join(x))
+
+        # Drop intermediate columns
+        lumped_densities = lumped_densities.drop(columns=['sum_N_k', 'sum_g_k', 'g_lines_list'])
 
         return df, lumped_densities

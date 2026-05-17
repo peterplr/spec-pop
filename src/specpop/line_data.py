@@ -158,5 +158,6 @@ class LineData:
             'g_lumped': g_lumped,
             'is_metastable': is_meta,
             'is_ambiguous': is_ambiguous,
-            'info_message': info_message
+            'info_message': info_message,
+            'upper_state_id': f"{conf_k}_{term_k}_{j_k}"
         }
